@@ -25,7 +25,7 @@ Currency Rate Update: TCMB.gov.tr
 
 |badge1| |badge2| |badge3| |badge4| |badge5| 
 
-This module adds `TCMB.gov.tr <https://tcmb.gov.tr/>`_ as currency rate provider.
+This module adds `TCMB.gov.tr <https://tcmb.gov.tr/>`_ as currency rate provider. Central Bank of the Republic of Turkey.
 
 
 **Table of contents**

@@ -1,32 +1,39 @@
-# Copyright 2020 Yiğit Budak (https://github.com/yibudak)
-# Copyright 2009 Camptocamp
-# Copyright 2009 Grzegorz Grzelak
-# Copyright 2019 Brainbean Apps (https://brainbeanapps.com)
-# License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
+# Copyright 2021 Yiğit Budak (https://github.com/yibudak)
+# -*- coding: utf-8 -*-
 
-from collections import defaultdict
-from datetime import date, timedelta
-from urllib.request import urlopen
-import xml.sax
-
+from datetime import datetime, timedelta, date
 from odoo import models, fields, api
+from odoo.tools.translate import _
+import logging
+from lxml.etree import fromstring
+import requests
+
+_logger = logging.getLogger(__name__)
 
 
-class ResCurrencyRateProviderECB(models.Model):
+class ResCurrencyRateProviderTCMB(models.Model):
     _inherit = 'res.currency.rate.provider'
 
     service = fields.Selection(
-        selection_add=[('TCMB', 'Turkish Central Bank')],
+        selection_add=[('TCMB', 'Central Bank of the Republic of Turkey')],
+        default="TCMB"
     )
+    service_rate_type = fields.Selection([
+        ('ForexBuying', _('Forex Buy')),
+        ('ForexSelling', _('Forex Sell')),
+        ('BanknoteBuying', _('Banknote Buy')),
+        ('BanknoteSelling', _('Banknote Sell'))
+        ], string='Service Rate Type', default="ForexBuying")
+
 
     @api.multi
     def _get_supported_currencies(self):
         self.ensure_one()
         if self.service != 'TCMB':
-            return super()._get_supported_currencies()  # pragma: no cover
+            return super()._get_supported_currencies()
 
         # List of currencies obrained from:
-        # https://www.tcmb.gov.tr/kurlar/today.xml
+        # http://www.tcmb.gov.tr/kurlar/today.xml
         return \
             [
                 'USD', 'AUD', 'DKK', 'EUR', 'GBP', 'CHF', 'SEK', 'CAD',
@@ -34,63 +41,85 @@ class ResCurrencyRateProviderECB(models.Model):
                 'CNY', 'PKR', 'QAR', 'XDR', 'TRY'
             ]
 
+
     @api.multi
     def _obtain_rates(self, base_currency, currencies, date_from, date_to):
         self.ensure_one()
         if self.service != 'TCMB':
-            return super()._obtain_rates(base_currency, currencies, date_from,
-                                         date_to)  # pragma: no cover
+            return super()._obtain_rates(base_currency, currencies, date_from, date_to)
+        
         invert_calculation = False
         if base_currency != 'TRY':
             invert_calculation = True
             if base_currency not in currencies:
                 currencies.append(base_currency)
 
-        # Important : as explained on the TCMB web site, the currencies are
-        # updated at 15:30 Istanbul time ; so, until 3:30 p.m. Istanbul time
-        url = 'https://www.tcmb.gov.tr/kurlar/today.xml'
-
-        handler = TCMBRatesHandler(currencies, date_from, date_to)
-        with urlopen(url) as response:
-            xml.sax.parse(response, handler)
-        content = handler.content
+        if 'TRY' in currencies:
+            currencies.remove('TRY')
+        
+        
+        def daterange(start_date, end_date):
+            for n in range(int((end_date - start_date).days)):
+                yield start_date + timedelta(n)
+        
+        result = {}
+        if date_from == date_to and date_from == date.today():
+            url = 'http://www.tcmb.gov.tr/kurlar/today.xml'
+            try:
+                rate_date, currency_data = self.get_tcmb_currency_data(url, currencies)
+                result[rate_date] = currency_data
+            except Exception:
+                _logger.error(_('No currency rate on %s'%(date_from.strftime("%Y-%m-%d"))))
+        else:
+            for single_date in daterange(date_from, date_to):
+                year = str(single_date.year)
+                month = '{:02d}'.format(single_date.month)
+                day = '{:02d}'.format(single_date.day)
+                url = "https://www.tcmb.gov.tr/kurlar/%s%s/%s%s%s.xml" % (year, month, day, month, year)
+                try:
+                    rate_date, currency_data = self.get_tcmb_currency_data(url, currencies)
+                    result[rate_date] = currency_data
+                except Exception:
+                    _logger.error(_('No currency rate on %s'%(single_date.strftime("%Y-%m-%d"))))
+                    continue
+        
+        content = result
         if invert_calculation:
             for k in content.keys():
                 base_rate = float(content[k][base_currency])
                 for rate in content[k].keys():
                     content[k][rate] = str(float(content[k][rate])/base_rate)
-                    content[k]['TRY'] = str(1.0000/base_rate)
+                content[k]['TRY'] = str(1.0/base_rate)
         return content
 
 
-class TCMBRatesHandler(xml.sax.ContentHandler):
-    def __init__(self, currencies, date_from, date_to):
-        self.currencies = currencies
-        self.date_from = date_from
-        self.date_to = date_to
-        self.date = None
-        self.content = defaultdict(dict)
+    def rate_retrieve(self, dom, currency, rate_type):
+        res = {}
+        xpath_currency_rate = "./Currency[@Kod='%s']/%s" % (currency.upper(), rate_type)
+        res['rate_currency'] = float(
+            dom.findall(xpath_currency_rate)[0].text
+        )
+        xpath_rate_ref = "./Currency[@Kod='%s']/Unit" % currency.upper()
+        res['rate_ref'] = float(dom.findall(xpath_rate_ref)[0].text)
+        return res
 
-    def startElement(self, name, attrs):
-        if name == 'Tarih_Date' and 'Tarih' in attrs:
-            d = attrs['Tarih']
-            d = '%s-%s-%s' % (  d[6:10],
-                                d[3:5],
-                                d[0:2])
-            self.date = fields.Date.from_string(d)
-            self.content[self.date.isoformat()]['TRY'] = '1.0000'
-            self.rate_found = False
-        elif name == 'Currency':
-            self.currency = attrs['CurrencyCode']
 
-        elif name == 'ForexBuying':
-            self.rate_found = True
+    def get_tcmb_currency_data(self, url, currencies):
+        response = requests.get(url).text
+        dom = fromstring(response.encode('utf-8'))
 
-    def characters(self, content):
-        if self.rate_found:
-            rate = content
-            if (self.date_from is None or self.date >= self.date_from) and \
-                    (self.date_to is None or self.date <= self.date_to) and \
-                    self.currency in self.currencies:
-                self.content[self.date.isoformat()][self.currency] = rate
-                self.rate_found = False
+        _logger.debug("TCMB sent a valid XML file")
+
+        date_string = dom.get('Date')
+        rate_date = str(datetime.strptime(date_string, "%m/%d/%Y").date())
+        currency_data = {}
+        rate_type = self.service_rate_type
+        for currency in currencies:
+            curr_data = self.rate_retrieve(dom, currency, rate_type)
+            rate = curr_data['rate_ref'] / (curr_data['rate_currency'] or 1.0)
+            currency_data[currency] = rate
+        
+        return rate_date, currency_data
+
+
+

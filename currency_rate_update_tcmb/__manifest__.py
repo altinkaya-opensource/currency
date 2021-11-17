@@ -18,6 +18,6 @@
         'currency_rate_update',
     ],
     'data': [
-
+        'views/res_currency_rate_provider.xml',
     ],
 }

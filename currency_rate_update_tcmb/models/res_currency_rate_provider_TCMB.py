@@ -47,7 +47,7 @@ class ResCurrencyRateProviderTCMB(models.Model):
         self.ensure_one()
         if self.service != 'TCMB':
             return super()._obtain_rates(base_currency, currencies, date_from, date_to)
-        
+
         invert_calculation = False
         if base_currency != 'TRY':
             invert_calculation = True
@@ -56,15 +56,15 @@ class ResCurrencyRateProviderTCMB(models.Model):
 
         if 'TRY' in currencies:
             currencies.remove('TRY')
-        
-        
+
+
         def daterange(start_date, end_date):
             for n in range(int((end_date - start_date).days)):
                 yield start_date + timedelta(n)
-        
+
         result = {}
         if date_from == date_to and date_from == date.today():
-            url = 'http://www.tcmb.gov.tr/kurlar/today.xml'
+            url = 'https://www.tcmb.gov.tr/kurlar/today.xml'
             try:
                 rate_date, currency_data = self.get_tcmb_currency_data(url, currencies)
                 result[rate_date] = currency_data
@@ -82,7 +82,7 @@ class ResCurrencyRateProviderTCMB(models.Model):
                 except Exception:
                     _logger.error(_('No currency rate on %s'%(single_date.strftime("%Y-%m-%d"))))
                     continue
-        
+
         content = result
         if invert_calculation:
             for k in content.keys():
@@ -118,7 +118,7 @@ class ResCurrencyRateProviderTCMB(models.Model):
             curr_data = self.rate_retrieve(dom, currency, rate_type)
             rate = curr_data['rate_ref'] / (curr_data['rate_currency'] or 1.0)
             currency_data[currency] = rate
-        
+
         return rate_date, currency_data
 
 

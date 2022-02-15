@@ -23,7 +23,7 @@ class ResCurrencyRateProviderTCMB(models.Model):
         ('ForexSelling', _('Forex Sell')),
         ('BanknoteBuying', _('Banknote Buy')),
         ('BanknoteSelling', _('Banknote Sell'))
-        ], string='Service Rate Type', default="ForexBuying")
+        ], string='Service Rate Type', default="ForexBuying", required=True)
 
 
     @api.multi

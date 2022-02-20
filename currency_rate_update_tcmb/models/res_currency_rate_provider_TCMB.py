@@ -66,8 +66,8 @@ class ResCurrencyRateProviderTCMB(models.Model):
         if date_from == date_to and date_from == date.today():
             url = 'https://www.tcmb.gov.tr/kurlar/today.xml'
             try:
-                rate_date, currency_data = self.get_tcmb_currency_data(url, currencies)
-                result[rate_date] = currency_data
+                currency_data = self.get_tcmb_currency_data(url, currencies)
+                result[(date.today() - timedelta(days=1)).strftime('%Y-%m-%d')] = currency_data
             except Exception:
                 _logger.error(_('No currency rate on %s'%(date_from.strftime("%Y-%m-%d"))))
         else:
@@ -77,8 +77,8 @@ class ResCurrencyRateProviderTCMB(models.Model):
                 day = '{:02d}'.format(single_date.day)
                 url = "https://www.tcmb.gov.tr/kurlar/%s%s/%s%s%s.xml" % (year, month, day, month, year)
                 try:
-                    rate_date, currency_data = self.get_tcmb_currency_data(url, currencies)
-                    result[rate_date] = currency_data
+                    currency_data = self.get_tcmb_currency_data(url, currencies)
+                    result[(single_date - timedelta(days=1)).strftime('%Y-%m-%d')] = currency_data #bir gun oncesinin kurunu al
                 except Exception:
                     _logger.error(_('No currency rate on %s'%(single_date.strftime("%Y-%m-%d"))))
                     continue
@@ -109,9 +109,6 @@ class ResCurrencyRateProviderTCMB(models.Model):
         dom = fromstring(response.encode('utf-8'))
 
         _logger.debug("TCMB sent a valid XML file")
-
-        date_string = dom.get('Date')
-        rate_date = str(datetime.strptime(date_string, "%m/%d/%Y").date())
         currency_data = {}
         rate_type = self.service_rate_type
         for currency in currencies:
@@ -119,7 +116,7 @@ class ResCurrencyRateProviderTCMB(models.Model):
             rate = curr_data['rate_ref'] / (curr_data['rate_currency'] or 1.0)
             currency_data[currency] = rate
 
-        return rate_date, currency_data
+        return currency_data
 
 
 

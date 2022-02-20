@@ -67,7 +67,7 @@ class ResCurrencyRateProviderTCMB(models.Model):
             url = 'https://www.tcmb.gov.tr/kurlar/today.xml'
             try:
                 currency_data = self.get_tcmb_currency_data(url, currencies)
-                result[(date.today() - timedelta(days=1)).strftime('%Y-%m-%d')] = currency_data
+                result[(date.today() + timedelta(days=1)).strftime('%Y-%m-%d')] = currency_data
             except Exception:
                 _logger.error(_('No currency rate on %s'%(date_from.strftime("%Y-%m-%d"))))
         else:
@@ -78,7 +78,7 @@ class ResCurrencyRateProviderTCMB(models.Model):
                 url = "https://www.tcmb.gov.tr/kurlar/%s%s/%s%s%s.xml" % (year, month, day, month, year)
                 try:
                     currency_data = self.get_tcmb_currency_data(url, currencies)
-                    result[(single_date - timedelta(days=1)).strftime('%Y-%m-%d')] = currency_data #bir gun oncesinin kurunu al
+                    result[(single_date + timedelta(days=1)).strftime('%Y-%m-%d')] = currency_data #bir gun oncesinin kurunu al
                 except Exception:
                     _logger.error(_('No currency rate on %s'%(single_date.strftime("%Y-%m-%d"))))
                     continue

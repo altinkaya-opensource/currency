@@ -57,7 +57,6 @@ class ResCurrencyRateProviderTCMB(models.Model):
         if 'TRY' in currencies:
             currencies.remove('TRY')
 
-
         def daterange(start_date, end_date):
             for n in range(int((end_date - start_date).days)):
                 yield start_date + timedelta(n)
@@ -66,8 +65,10 @@ class ResCurrencyRateProviderTCMB(models.Model):
         if date_from == date_to and date_from == date.today():
             url = 'https://www.tcmb.gov.tr/kurlar/today.xml'
             try:
+                rate_date = (date.today() + timedelta(days=1)).strftime('%Y-%m-%d')
                 currency_data = self.get_tcmb_currency_data(url, currencies)
-                result[(date.today() + timedelta(days=1)).strftime('%Y-%m-%d')] = currency_data
+                result[rate_date] = currency_data
+                self._action_log_update(rate_date)
             except Exception:
                 _logger.error(_('No currency rate on %s'%(date_from.strftime("%Y-%m-%d"))))
         else:
@@ -77,8 +78,10 @@ class ResCurrencyRateProviderTCMB(models.Model):
                 day = '{:02d}'.format(single_date.day)
                 url = "https://www.tcmb.gov.tr/kurlar/%s%s/%s%s%s.xml" % (year, month, day, month, year)
                 try:
+                    rate_date = (single_date + timedelta(days=1)).strftime('%Y-%m-%d')
                     currency_data = self.get_tcmb_currency_data(url, currencies)
-                    result[(single_date + timedelta(days=1)).strftime('%Y-%m-%d')] = currency_data #bir gun oncesinin kurunu al
+                    result[rate_date] = currency_data #bir gun oncesinin kurunu al
+                    self._action_log_update(rate_date)
                 except Exception:
                     _logger.error(_('No currency rate on %s'%(single_date.strftime("%Y-%m-%d"))))
                     continue
@@ -118,5 +121,13 @@ class ResCurrencyRateProviderTCMB(models.Model):
 
         return currency_data
 
-
-
+    def _action_log_update(self, rate_date):
+        self.env['mail.message'].create({
+             'email_from': 'Administrator',
+             'author_id': 2,
+             'model': 'res.currency.rate.provider',
+             'type': 'comment',
+             'subtype_id': self.env.ref('mail.mt_comment').id,
+             'body': "%s Currency Rate Updated at %s" % (rate_date, datetime.now()),
+             'res_id': self.id,
+          })

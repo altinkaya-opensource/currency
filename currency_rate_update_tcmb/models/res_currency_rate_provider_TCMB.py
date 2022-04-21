@@ -65,7 +65,7 @@ class ResCurrencyRateProviderTCMB(models.Model):
         if date_from == date_to and date_from == date.today():
             url = 'https://www.tcmb.gov.tr/kurlar/today.xml'
             try:
-                rate_date = (date.today() + timedelta(days=1)).strftime('%Y-%m-%d')
+                rate_date = date.today().strftime('%Y-%m-%d')
                 currency_data = self.get_tcmb_currency_data(url, currencies)
                 result[rate_date] = currency_data
                 self._action_log_update(rate_date)

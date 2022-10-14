@@ -23,8 +23,7 @@ class ResCurrencyRateProviderTCMB(models.Model):
         ('ForexSelling', _('Forex Sell')),
         ('BanknoteBuying', _('Banknote Buy')),
         ('BanknoteSelling', _('Banknote Sell'))
-        ], string='Service Rate Type', default="ForexBuying", required=True)
-
+    ], string='Service Rate Type', default="ForexBuying", required=True)
 
     @api.multi
     def _get_supported_currencies(self):
@@ -40,7 +39,6 @@ class ResCurrencyRateProviderTCMB(models.Model):
                 'KWD', 'NOK', 'SAR', 'JPY', 'BGN', 'RON', 'RUB', 'IRR',
                 'CNY', 'PKR', 'QAR', 'XDR', 'TRY'
             ]
-
 
     @api.multi
     def _obtain_rates(self, base_currency, currencies, date_from, date_to):
@@ -70,7 +68,7 @@ class ResCurrencyRateProviderTCMB(models.Model):
                 result[rate_date] = currency_data
                 self._action_log_update(rate_date)
             except Exception:
-                _logger.error(_('No currency rate on %s'%(date_from.strftime("%Y-%m-%d"))))
+                _logger.error(_('No currency rate on %s' % (date_from.strftime("%Y-%m-%d"))))
         else:
             for single_date in daterange(date_from, date_to):
                 year = str(single_date.year)
@@ -80,10 +78,10 @@ class ResCurrencyRateProviderTCMB(models.Model):
                 try:
                     rate_date = (single_date + timedelta(days=1)).strftime('%Y-%m-%d')
                     currency_data = self.get_tcmb_currency_data(url, currencies)
-                    result[rate_date] = currency_data #bir gun oncesinin kurunu al
+                    result[rate_date] = currency_data  # bir gun oncesinin kurunu al
                     self._action_log_update(rate_date)
                 except Exception:
-                    _logger.error(_('No currency rate on %s'%(single_date.strftime("%Y-%m-%d"))))
+                    _logger.error(_('No currency rate on %s' % (single_date.strftime("%Y-%m-%d"))))
                     continue
 
         content = result
@@ -91,10 +89,9 @@ class ResCurrencyRateProviderTCMB(models.Model):
             for k in content.keys():
                 base_rate = float(content[k][base_currency])
                 for rate in content[k].keys():
-                    content[k][rate] = str(float(content[k][rate])/base_rate)
-                content[k]['TRY'] = str(1.0/base_rate)
+                    content[k][rate] = str(float(content[k][rate]) / base_rate)
+                content[k]['TRY'] = str(1.0 / base_rate)
         return content
-
 
     def rate_retrieve(self, dom, currency, rate_type):
         res = {}
@@ -105,7 +102,6 @@ class ResCurrencyRateProviderTCMB(models.Model):
         xpath_rate_ref = "./Currency[@Kod='%s']/Unit" % currency.upper()
         res['rate_ref'] = float(dom.findall(xpath_rate_ref)[0].text)
         return res
-
 
     def get_tcmb_currency_data(self, url, currencies):
         response = requests.get(url).text
@@ -123,11 +119,10 @@ class ResCurrencyRateProviderTCMB(models.Model):
 
     def _action_log_update(self, rate_date):
         self.env['mail.message'].create({
-             'email_from': 'Administrator',
-             'author_id': 2,
-             'model': 'res.currency.rate.provider',
-             'type': 'comment',
-             'subtype_id': self.env.ref('mail.mt_comment').id,
-             'body': "%s Currency Rate Updated at %s" % (rate_date, datetime.now()),
-             'res_id': self.id,
-          })
+            'email_from': 'Administrator',
+            'author_id': 2,
+            'model': 'res.currency.rate.provider',
+            'subtype_id': self.env.ref('mail.mt_comment').id,
+            'body': "%s Currency Rate Updated at %s" % (rate_date, datetime.now()),
+            'res_id': self.id,
+        })

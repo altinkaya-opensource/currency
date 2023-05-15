@@ -10,6 +10,12 @@ import requests
 
 _logger = logging.getLogger(__name__)
 
+TCMB_RATE_TYPES = [
+    "ForexBuying",
+    "ForexSelling",
+    "BanknoteBuying",
+    "BanknoteSelling",
+]
 
 class ResCurrencyRateProviderTCMB(models.Model):
     _inherit = 'res.currency.rate.provider'
@@ -109,11 +115,11 @@ class ResCurrencyRateProviderTCMB(models.Model):
 
         _logger.debug("TCMB sent a valid XML file")
         currency_data = {}
-        rate_type = self.service_rate_type
         for currency in currencies:
-            curr_data = self.rate_retrieve(dom, currency, rate_type)
-            rate = curr_data['rate_ref'] / (curr_data['rate_currency'] or 1.0)
-            currency_data[currency] = rate
+            currency_data[currency] = {}
+            for rate_type in TCMB_RATE_TYPES:
+                curr_data = self.rate_retrieve(dom, currency, rate_type)
+                currency_data[currency][rate_type] = curr_data['rate_ref'] / (curr_data['rate_currency'] or 1.0)
 
         return currency_data
 

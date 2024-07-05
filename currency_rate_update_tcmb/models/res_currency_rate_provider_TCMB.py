@@ -124,7 +124,10 @@ class ResCurrencyRateProviderTCMB(models.Model):
         for currency in currencies:
             currency_data[currency] = {}
             for rate_type in TCMB_RATE_TYPES:
-                curr_data = self.rate_retrieve(dom, currency, rate_type)
+                try:
+                    curr_data = self.rate_retrieve(dom, currency, rate_type)
+                except TypeError:  # This means that the currency type is not exist in the currency list
+                    curr_data = {'rate_ref': 1.0, 'rate_currency': 1.0}
                 currency_data[currency][rate_type] = curr_data['rate_ref'] / (curr_data['rate_currency'] or 1.0)
 
         return currency_data

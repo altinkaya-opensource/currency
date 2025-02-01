@@ -11,6 +11,14 @@ from odoo import _, fields, models
 _logger = logging.getLogger(__name__)
 
 
+TCMB_RATE_TYPES = [
+    "ForexBuying",
+    "ForexSelling",
+    "BanknoteBuying",
+    "BanknoteSelling",
+]
+
+
 class ResCurrencyRateProviderTCMB(models.Model):
     _inherit = "res.currency.rate.provider"
 
@@ -121,7 +129,7 @@ class ResCurrencyRateProviderTCMB(models.Model):
                 content[k]["TRY"] = str(1.0 / base_rate)
         return content
 
-    def tcmb_rate_retrieve(self, dom, currency, rate_type):
+    def rate_retrieve(self, dom, currency, rate_type):
         res = {}
         xpath_currency_rate = "./Currency[@Kod='%s']/%s" % (currency.upper(), rate_type)
         res["rate_currency"] = float(dom.findall(xpath_currency_rate)[0].text)
@@ -130,15 +138,20 @@ class ResCurrencyRateProviderTCMB(models.Model):
         return res
 
     def get_tcmb_currency_data(self, url, currencies):
-        response = requests.get(url, timeout=15).text
+        response = requests.get(url).text
         dom = fromstring(response.encode("utf-8"))
 
         _logger.debug("TCMB sent a valid XML file")
         currency_data = {}
-        rate_type = self.service_rate_type
         for currency in currencies:
-            curr_data = self.tcmb_rate_retrieve(dom, currency, rate_type)
-            rate = curr_data["rate_ref"] / (curr_data["rate_currency"] or 1.0)
-            currency_data[currency] = rate
+            currency_data[currency] = {}
+            for rate_type in TCMB_RATE_TYPES:
+                try:
+                    curr_data = self.rate_retrieve(dom, currency, rate_type)
+                except TypeError:  # This means that the currency type is not exist in the currency list
+                    curr_data = {"rate_ref": 1.0, "rate_currency": 1.0}
+                currency_data[currency][rate_type] = curr_data["rate_ref"] / (
+                    curr_data["rate_currency"] or 1.0
+                )
 
         return currency_data

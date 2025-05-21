@@ -69,6 +69,40 @@ class ResCurrencyRateProviderTCMB(models.Model):
             "TRY",
         ]
 
+    def _get_last_tcmb_rates(self, current_date, currencies=None):
+        """ Get the last TCMB rates available before the given date. 
+
+        Args:
+            `current_date` (`datetime`): date to check the last rate before
+        for the currency
+            `currencies` (`list`): list of currencies to check
+
+        Returns:
+            `dict`: dictionary of currency rates
+        """
+
+        currency_data = {}
+
+        date_before = current_date - timedelta(days=1)
+
+        while (current_date - date_before) < timedelta(days=30):
+            year = str(date_before.year)
+            month = f"{date_before.month:02d}"
+            day = f"{date_before.day:02d}"
+            url = f"https://www.tcmb.gov.tr/kurlar/{year}{month}/{day}{month}{year}.xml"
+            try:
+                currency_data = self.get_tcmb_currency_data(url, currencies)
+                break
+            except Exception:
+                date_before -= timedelta(days=1)
+
+        if not currency_data:
+            raise ValueError(
+                _("No currency rate available for last 30 days until %s") % current_date.strftime("%Y-%m-%d")
+            )
+
+        return currency_data
+
     def _obtain_rates(self, base_currency, currencies, date_from, date_to):
         self.ensure_one()
         if self.service != "TCMB":
@@ -90,14 +124,17 @@ class ResCurrencyRateProviderTCMB(models.Model):
         result = {}
         if date_from == date_to and date_from == date.today():
             url = "https://www.tcmb.gov.tr/kurlar/today.xml"
+            rate_date = date.today().strftime("%Y-%m-%d")
             try:
-                rate_date = date.today().strftime("%Y-%m-%d")
                 currency_data = self.get_tcmb_currency_data(url, currencies)
                 result[rate_date] = currency_data
             except Exception:
                 _logger.info(
                     _("No currency rate on %s") % date_from.strftime("%Y-%m-%d")
                 )
+
+                result[rate_date] = self._get_last_tcmb_rates(date.today(), currencies)
+
         else:
             for single_date in daterange(date_from, date_to):
                 year = str(single_date.year)
@@ -110,15 +147,23 @@ class ResCurrencyRateProviderTCMB(models.Model):
                     month,
                     year,
                 )
+                last_rate = None
+                rate_date = single_date.strftime("%Y-%m-%d")
                 try:
-                    rate_date = single_date.strftime("%Y-%m-%d")
                     currency_data = self.get_tcmb_currency_data(url, currencies)
                     result[rate_date] = currency_data
+                    last_rate = currency_data
                 except Exception:
                     _logger.info(
                         _("No currency rate on %s") % single_date.strftime("%Y-%m-%d")
                     )
-                    continue
+
+                    if not last_rate:
+                        last_rate = self._get_last_tcmb_rates(
+                            single_date, currencies)
+                    
+                    result[rate_date] = last_rate
+                        
 
         content = result
         if invert_calculation:

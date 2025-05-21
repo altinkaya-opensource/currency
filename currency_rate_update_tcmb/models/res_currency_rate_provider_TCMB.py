@@ -136,6 +136,7 @@ class ResCurrencyRateProviderTCMB(models.Model):
                 result[rate_date] = self._get_last_tcmb_rates(date.today(), currencies)
 
         else:
+            last_rate = None
             for single_date in daterange(date_from, date_to):
                 year = str(single_date.year)
                 month = "{:02d}".format(single_date.month)
@@ -147,7 +148,6 @@ class ResCurrencyRateProviderTCMB(models.Model):
                     month,
                     year,
                 )
-                last_rate = None
                 rate_date = single_date.strftime("%Y-%m-%d")
                 try:
                     currency_data = self.get_tcmb_currency_data(url, currencies)

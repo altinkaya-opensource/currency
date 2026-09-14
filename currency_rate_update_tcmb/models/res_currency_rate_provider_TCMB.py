@@ -70,7 +70,7 @@ class ResCurrencyRateProviderTCMB(models.Model):
         ]
 
     def _get_last_tcmb_rates(self, current_date, currencies=None):
-        """ Get the last TCMB rates available before the given date. 
+        """Get the last TCMB rates available before the given date.
 
         Args:
             `current_date` (`datetime`): date to check the last rate before
@@ -98,7 +98,8 @@ class ResCurrencyRateProviderTCMB(models.Model):
 
         if not currency_data:
             raise ValueError(
-                _("No currency rate available for last 30 days until %s") % current_date.strftime("%Y-%m-%d")
+                _("No currency rate available for last 30 days until %s")
+                % current_date.strftime("%Y-%m-%d")
             )
 
         return currency_data
@@ -117,10 +118,6 @@ class ResCurrencyRateProviderTCMB(models.Model):
         if "TRY" in currencies:
             currencies.remove("TRY")
 
-        def daterange(start_date, end_date):
-            for n in range(int((end_date - start_date).days)):
-                yield start_date + timedelta(n)
-
         result = {}
         if date_from == date_to and date_from == date.today():
             url = "https://www.tcmb.gov.tr/kurlar/today.xml"
@@ -137,7 +134,8 @@ class ResCurrencyRateProviderTCMB(models.Model):
 
         else:
             last_rate = None
-            for single_date in daterange(date_from, date_to):
+            for offset in range((date_to - date_from).days):
+                single_date = date_from + timedelta(days=offset)
                 year = str(single_date.year)
                 month = "{:02d}".format(single_date.month)
                 day = "{:02d}".format(single_date.day)
@@ -159,11 +157,9 @@ class ResCurrencyRateProviderTCMB(models.Model):
                     )
 
                     if not last_rate:
-                        last_rate = self._get_last_tcmb_rates(
-                            single_date, currencies)
-                    
+                        last_rate = self._get_last_tcmb_rates(single_date, currencies)
+
                     result[rate_date] = last_rate
-                        
 
         content = result
         if invert_calculation:
@@ -183,7 +179,7 @@ class ResCurrencyRateProviderTCMB(models.Model):
         return res
 
     def get_tcmb_currency_data(self, url, currencies):
-        response = requests.get(url).text
+        response = requests.get(url, timeout=30).text
         dom = fromstring(response.encode("utf-8"))
 
         _logger.debug("TCMB sent a valid XML file")
@@ -193,7 +189,7 @@ class ResCurrencyRateProviderTCMB(models.Model):
             for rate_type in TCMB_RATE_TYPES:
                 try:
                     curr_data = self.rate_retrieve(dom, currency, rate_type)
-                except TypeError:  # This means that the currency type is not exist in the currency list
+                except TypeError:  # The requested rate type is unavailable.
                     curr_data = {"rate_ref": 1.0, "rate_currency": 1.0}
                 currency_data[currency][rate_type] = curr_data["rate_ref"] / (
                     curr_data["rate_currency"] or 1.0

@@ -262,10 +262,14 @@ class ResCurrencyRateProviderXE(models.Model):
     def _parse_data(self, data, currencies):
         result = {}
         html_elem = etree.fromstring(data.content, etree.HTMLParser())
-        rows_elem = html_elem.xpath(".//div[@id='table-section']//tbody/tr")
+        rows_elem = html_elem.xpath(
+            ".//table/tbody/tr[th[@scope='row']/a[starts-with(@href, '/currency/')]]"
+        )
         for row_elem in rows_elem:
             currency_code = "".join(row_elem.find(".//th").itertext()).strip()
             if currency_code in currencies:
                 rate = float(row_elem.find("td[2]").text.replace(",", ""))
                 result[currency_code] = rate
+        if not result:
+            raise UserError(_("No exchange rates found in the XE response."))
         return result

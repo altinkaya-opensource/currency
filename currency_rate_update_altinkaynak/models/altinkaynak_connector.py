@@ -1,7 +1,8 @@
 # Copyright 2023 Yiğit Budak (https://github.com/yibudak)
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl)
-import requests
 from datetime import datetime
+
+import requests
 from bs4 import BeautifulSoup
 
 
@@ -38,7 +39,7 @@ class AltinkaynakConnector:
         Get tokens from altinkaynak.com
         :return:
         """
-        resp = requests.get(self.endpoint, headers=self.headers)
+        resp = requests.get(self.endpoint, headers=self.headers, timeout=30)
 
         # Set cookies
         self.cookies = resp.cookies
@@ -69,6 +70,7 @@ class AltinkaynakConnector:
             data=self.main_data,
             cookies=self.cookies,
             headers=self.headers,
+            timeout=30,
         )
         soup = BeautifulSoup(response.content, "html.parser")
         res = {}

@@ -2,10 +2,10 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 import logging
 from datetime import date, timedelta
-from odoo.addons.currency_rate_update_altinkaynak.models.altinkaynak_connector import (
-    AltinkaynakConnector,
-)
+
 from odoo import _, fields, models
+
+from .altinkaynak_connector import AltinkaynakConnector
 
 _logger = logging.getLogger(__name__)
 
@@ -83,19 +83,19 @@ class ResCurrencyRateProviderAltinkaynak(models.Model):
                 result[date_to] = currency_data
                 self._action_log_update(rate_date)
             except Exception:
-                _logger.info(
-                    _("No currency rate on %s" % (date_from.strftime("%Y-%m-%d")))
-                )
+                _logger.info("No currency rate on %s", date_from.strftime("%Y-%m-%d"))
         else:
             for single_date in daterange(date_from, date_to):
                 rate_date = single_date.strftime("%d/%m/%Y")
                 try:
-                    currency_data = connector._get_rate(currencies, rate_date, rate_type)
+                    currency_data = connector._get_rate(
+                        currencies, rate_date, rate_type
+                    )
                     result[single_date] = currency_data
                     self._action_log_update(rate_date)
                 except Exception:
                     _logger.info(
-                        _("No currency rate on %s" % (single_date.strftime("%Y-%m-%d")))
+                        "No currency rate on %s", single_date.strftime("%Y-%m-%d")
                     )
                     continue
 

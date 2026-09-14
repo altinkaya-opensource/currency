@@ -2,7 +2,12 @@
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
 
 
+from unittest.mock import patch
+
+from requests import Response
+
 from odoo import fields
+from odoo.exceptions import UserError
 from odoo.tests import common
 
 
@@ -34,11 +39,26 @@ class TestResCurrencyRateProviderXE(common.TransactionCase):
         )
         cls.CurrencyRate.search([]).unlink()
 
+    def setUp(self):
+        super().setUp()
+        response = Response()
+        response.status_code = 200
+        response._content = b"""<html><table><tbody><tr>
+            <th scope="row"><a href="/currency/usd-us-dollar/">USD</a></th>
+            <td>US Dollar</td><td>1.25</td><td>0.8</td>
+            </tr></tbody></table></html>"""
+        request = patch.object(
+            type(self.xe_provider), "_request_data", return_value=response
+        )
+        request.start()
+        self.addCleanup(request.stop)
+
     def test_cron(self):
         self.xe_provider._scheduled_update()
         rates = self.CurrencyRate.search([])
         self.assertEqual(len(rates), 1)
         self.assertEqual(rates.currency_id, self.usd_currency)
+        self.assertAlmostEqual(rates.rate, 1.25)
 
     def test_wizard(self):
         wizard = (
@@ -50,3 +70,10 @@ class TestResCurrencyRateProviderXE(common.TransactionCase):
         rates = self.CurrencyRate.search([])
         self.assertEqual(len(rates), 1)
         self.assertEqual(rates.currency_id, self.usd_currency)
+        self.assertAlmostEqual(rates.rate, 1.25)
+
+    def test_missing_table_is_reported(self):
+        response = Response()
+        response._content = b"<html><p>No currency table</p></html>"
+        with self.assertRaises(UserError):
+            self.xe_provider._parse_data(response, ["USD"])

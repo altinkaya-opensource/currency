@@ -2,6 +2,7 @@
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
 
 
+from datetime import timedelta
 from unittest.mock import patch
 
 from requests import Response
@@ -31,6 +32,9 @@ class TestResCurrencyRateProviderXE(common.TransactionCase):
         cls.xe_provider = cls.CurrencyRateProvider.create(
             {
                 "service": "XE",
+                # Test a daily increment, not the initial historical catch-up.
+                "last_successful_run": cls.today - timedelta(days=1),
+                "next_run": cls.today,
                 "currency_ids": [
                     (4, cls.usd_currency.id),
                     (4, cls.eur_currency.id),
